@@ -1,0 +1,69 @@
+Try HackMe--> https://tryhackme.com/dashboard
+
+Pickle Rick [solved]
+============
+Launch Attacking machine in tryHackMe
+enumerate machine with NMAP  --> nmap -T5 -p- -sV -vv 10.10.70.30 -oA nmap
+	Found two services running 1) Openssh 7.2p2 2) running on 22 port, Apache 2.4.18 running on 80 port
+	
+	searched exploits for Openssh 7.2
+
+	Below exploits did not work
+	===============================================
+	msf > use auxiliary/scanner/ssh/ssh_enumusers
+	msf auxiliary(ssh_enumusers) > show actions
+    	...actions...
+	msf auxiliary(ssh_enumusers) > set ACTION < action-name >
+	msf auxiliary(ssh_enumusers) > show options
+    	...show and set options...
+	msf auxiliary(ssh_enumusers) > run
+	================================================
+
+	Not tried this, need to try next time
+	======================================================
+	msf > use auxiliary/scanner/http/apache_optionsbleed
+	msf auxiliary(apache_optionsbleed) > show actions
+   	 ...actions...
+	msf auxiliary(apache_optionsbleed) > set ACTION < action-name >
+	msf auxiliary(apache_optionsbleed) > show options
+    	...show and set options...
+	msf auxiliary(apache_optionsbleed) > run
+	========================================================
+
+	Apache running on port 80, so open webserver on web browser--> nothing found in front page/UI
+	view page source-> found username "RickRul3s
+	open robots.txt-> found some random alphanumeric value   (guessing this as password)
+
+	Next find sub directories , using DirBuster, Gobuster tools-- > Found login.php page exists
+	-------------------------------------------
+	dirb http://10.10.70.30 /usr/share/wordlist.txt
+	-----------------------------------------
+	Try login via browser-  http://10.10.70.30/login.php, -> username as we found during view page source and password guessed from Robots.txt
+	Login success
+	Found command input page in webserver, check which are OS commands working, E.g cat, ls, find, home,grep,less, pwd, head,tail
+	Found that except pwd, ls, less remaining commands not working
+	output of pwd-?/var/www/html
+	output of ls-> found clue.txt, and Suser3* file
+	try to see content of clue,txt using less command (cat command not working so) -> less clue.txt
+
+	From the clue.txt  found string, to get ingredients navigate throught file systems
+	Try seeing content of Suser3* file-> lss Suser3* file-> Found First ingredient
+
+	search for home directory
+	less /home-> Found Rick directory
+	inside Rick directory (less /home/Rick) found 2nd ingredient)-> less /home/Rick/"second ingredients"
+	
+	//check for super user permission
+	sudo -l   ---> Found (ALL) NOPASSWORD:ALL  ---> means any user can run any command without login required
+
+	sudo file format as below
+	[Any user] [any host]:[on behalf of any user] [any command]
+	meaning of above is, any user on any host can run any command on behalf of any user
+
+	search in root directory, to search in root directory normal user need super user permission, in sudo file format if permission given for execute any command y any user then
+	sudo ls /root--> found 3rd.txt file
+	contents of 3rd.txt file given 3rd ingredient ( sudo lss /root/3rd.txt
+
+=====================================================================================================================
+
+
